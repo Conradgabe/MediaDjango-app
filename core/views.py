@@ -4,14 +4,17 @@ from django.contrib.auth.models import User, auth
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 
-from .models import Profile
+from .models import Profile, Post, LikePost
 
 @login_required(redirect_field_name='reg')
 def index(request):
     user_obj = User.objects.get(username=request.user)
     user_profile = Profile.objects.get(user=user_obj)
+
+    posts = Post.objects.all()
     context ={
-        'user_profile': user_profile
+        'user_profile': user_profile,
+        'posts': posts
     }
     return render(request, 'index.html', context)
 
@@ -77,7 +80,7 @@ def settings(request):
         if request.FILES.get('image') == None:
             image = user_profile.profile_img
             bio = request.POST['bio']
-            location = request['location']
+            location = request.POST['location']
 
             user_profile.profile_img = image
             user_profile.bio = bio
@@ -103,4 +106,40 @@ def settings(request):
 
 @login_required
 def upload(request):
+
+    if request.method == 'POST':
+        user = request.user.username
+        image = request.FILES.get('image_upload')
+        caption = request.POST['caption']
+
+        new_post = Post.objects.create(
+            user=user, image=image, caption=caption
+        )
+        new_post.save()
+        return redirect('index')
+    else:
+        return redirect('index')
     return HttpResponse('UPLOAD')
+
+def like_post(request):
+    username = request.user.username
+    post_id = request.GET['post_id']
+
+    post = Post.objects.get(id=post_id)
+
+    like_filter = LikePost.objects.filter(username=username, post_id=post_id).first()
+
+    if like_filter == None:
+        new_post = LikePost.objects.create(username=username, post_id=post_id)
+        new_post.save()
+        post.no_of_likes += 1
+        post.save()
+        return redirect('index')
+
+    else:
+        like_filter.delete()
+        post.no_of_likes -= 1
+        post.save()
+        return redirect('index')
+    
+    
